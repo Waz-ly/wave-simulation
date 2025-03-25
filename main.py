@@ -7,6 +7,7 @@ import os
 import wave
 from scipy.io import wavfile
 import pygame
+from time import perf_counter
 
 # global vars
 simulation_fps = 15
@@ -41,8 +42,8 @@ def convert_to_audio(data: np.ndarray, newSampleRate, originalSampleRate) -> np.
 
     return audio[np.linspace(0, audio.shape[0], newSampleRate*audio.shape[0]//originalSampleRate, endpoint=False, dtype=int)]
 
-def update_space(current_space, past_space, walls, delta_time, wavespeed, damping_factor):
-    curve_of_space = np.copy(current_space)
+def update_space(current_space, past_space, walls_info, delta_time, wavespeed, damping_factor):
+    curve_of_space = np.zeros(current_space.shape)
     
     curve_of_space[1:-1, 1:-1] = (    current_space[1:-1,  :-2]
                                   +   current_space[ :-2, 1:-1]
@@ -50,16 +51,15 @@ def update_space(current_space, past_space, walls, delta_time, wavespeed, dampin
                                   +   current_space[2:  , 1:-1]
                                   +   current_space[1:-1, 2:  ] )
     
-    future_space = wavespeed**2 * delta_time**2 * curve_of_space - past_space + 2*current_space
-    future_space += damping_factor*current_space - damping_factor*future_space
+    future_space = (wavespeed**2 * delta_time**2 - damping_factor)*curve_of_space - (1 - damping_factor)*past_space + (2 - damping_factor)*current_space
 
     # wall collisions
-    valid_neighbors = 1 - walls
-    neighbor_count = sum(np.roll(valid_neighbors, shift, axis=(0, 1)) for shift in [(0, 1), (0, -1), (1, 0), (-1, 0)])
-    neighbor_count[neighbor_count == 0] = 1
-    neighbor_sum = sum(np.roll(future_space * valid_neighbors, shift, axis=(0, 1)) for shift in [(0, 1), (0, -1), (1, 0), (-1, 0)])
+    walls_info[3][1:-1, 1:-1] = ( walls_info[1][1:-1,  :-2] * future_space[1:-1,  :-2]
+                                + walls_info[1][ :-2, 1:-1] * future_space[ :-2, 1:-1]
+                                + walls_info[1][2:  , 1:-1] * future_space[2:  , 1:-1]
+                                + walls_info[1][1:-1, 2:  ] * future_space[1:-1, 2:  ] )
 
-    future_space = np.where(walls, wall_damping_factor * (neighbor_sum / neighbor_count), future_space)
+    future_space = np.where(walls_info[0], wall_damping_factor * (walls_info[3] / walls_info[2]), future_space)
 
     # border collisions
     future_space[0, :] = wall_damping_factor*future_space[1, :]
@@ -88,23 +88,6 @@ def build_walls(width, height, mode='audio'):
 
     return walls
 
-def apply_impulse(space, point, strength, mode='audio'):
-    if mode == 'audio':
-
-        for dx in range(-2, 3):
-            for dy in range(-2, 3):
-                weight = np.exp(-(dx**2 + dy**2) / (2))
-                space[point[0]//10 + dx, point[1]//10 + dy] += weight * strength
-
-    elif mode == 'visual':
-
-        for dx in range(-4, 5):
-            for dy in range(-4, 5):
-                weight = np.exp(-(dx**2 + dy**2) / (10))
-                space[point[0] + dx, point[1] + dy] += weight * strength
-
-    return space
-
 class Simulation:
     def __init__(self, window, width, height, buffer, delta_time, mode='audio'):
         self.window = window
@@ -125,9 +108,19 @@ class Simulation:
 
         self.current_space = np.zeros((width, height))
         self.past_space = np.zeros((width, height))
-        self.wall_map = np.zeros((width, height))
 
+        # wall setup
+        self.wall_map = np.zeros((width, height))
         self.walls = build_walls(width, height, self.mode)
+        self.not_walls = 1 - self.walls
+        self.neighbor_not_wall_count = np.zeros((width, height))
+        self.neighbor_not_wall_count[1:-1, 1:-1] = ( self.not_walls[1:-1,  :-2]
+                                                   + self.not_walls[ :-2, 1:-1]
+                                                   + self.not_walls[2:  , 1:-1]
+                                                   + self.not_walls[1:-1, 2:  ] )
+        self.neighbor_not_wall_count[self.neighbor_not_wall_count == 0] = 1
+        self.neighbor_sum = np.zeros((width, height))
+        self.walls_info = (self.walls, self.not_walls, self.neighbor_not_wall_count, self.neighbor_sum)
         self.wall_map[self.walls] = np.NaN
         
         # self.current_space = apply_impulse(self.current_space, impulse_point, 2)
@@ -142,22 +135,33 @@ class Simulation:
         self.window.blit(surf, (self.buffer, self.buffer))
 
     def update(self):
-        self.current_space, self.past_space = update_space(self.current_space, self.past_space, self.walls, self.delta_time, self.wavespeed, self.damping_factor)
+        self.current_space, self.past_space = update_space(self.current_space, self.past_space, self.walls_info, self.delta_time, self.wavespeed, self.damping_factor)
     
     def apply_impulse(self, strength):
-        self.current_space = apply_impulse(self.current_space, impulse_point, strength, mode=self.mode)
+        if self.mode == 'audio':
+        
+            self.current_space[impulse_point[0]//10, impulse_point[1]//10] += strength
+
+        elif self.mode == 'visual':
+
+            for dx in range(-4, 5):
+                for dy in range(-4, 5):
+                    weight = np.exp(-(dx**2 + dy**2) / (10))
+                    self.current_space[impulse_point[0] + dx, impulse_point[1] + dy] += weight * strength
 
     def get_point(self, point):
-        speaker_average = 0
-        sum_of_weights = 0
+        # speaker_average = 0
+        # sum_of_weights = 0
 
-        for dx in range(-3, 4):
-            for dy in range(-3, 4):
-                weight = np.exp(-(dx**2 + dy**2) / (10))
-                sum_of_weights += weight
-                speaker_average += weight * self.current_space[point[0] + dx, point[1] + dy]
+        # for dx in range(-3, 4):
+        #     for dy in range(-3, 4):
+        #         weight = np.exp(-(dx**2 + dy**2) / (10))
+        #         sum_of_weights += weight
+        #         speaker_average += weight * self.current_space[point[0] + dx, point[1] + dy]
         
-        return speaker_average/sum_of_weights
+        # return speaker_average/sum_of_weights
+
+        return self.current_space[point]
 
 class WaveSimulation:
     def __init__(self, window, width, height, buffer, audio):
@@ -216,6 +220,8 @@ if __name__ == '__main__':
     plt.title("original_fft")
     plt.show()
 
+    t1 = perf_counter()
+
     # dummy_window = pygame.display.set_mode((WIDTH//10 + 2*BUFFER, HEIGHT//10 + 2*BUFFER))
     dummy_window = None
     audio_simulation = Simulation(dummy_window, WIDTH//10, HEIGHT//10, BUFFER, 1/audio_sample_rate, mode='audio')
@@ -248,6 +254,10 @@ if __name__ == '__main__':
             audio_simulation.apply_impulse(audio[i])
         audio_simulation.update()
         mic.append(audio_simulation.get_point((532//10, 225//10)))
+
+    t2 = perf_counter()
+
+    print("audio simulation completed in:", t2-t1, "seconds")
 
     mic = mic / np.max(mic)
 
