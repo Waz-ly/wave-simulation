@@ -4,8 +4,8 @@ from configs import *
 class Speaker:
     def __init__(self, position, delay, audio_path, multiplier = 1):
         self.position = position
-        self.delay = delay * AUDIO_RATE
-        self.audio = read_audio(audio_path)
+        self.delay = int(delay * AUDIO_RATE)
+        self.audio = read_audio("assets/audio/" + audio_path + ".wav")
         self.max_time = len(self.audio) + self.delay
         self.multiplier = multiplier
 

@@ -1,7 +1,7 @@
 import numpy as np
 import ffmpeg
 import os
-from scipy.io import wavfile
+import wave
 
 def setup(folder: str, audio_sample_rate) -> None:
     for root, dirs, files in os.walk(folder):
@@ -11,29 +11,41 @@ def setup(folder: str, audio_sample_rate) -> None:
             if not file.startswith('.') and not os.path.isfile(newPath):
                 ffmpeg.input(path).output(newPath, loglevel='quiet', preset='ultrafast').run(overwrite_output=1)
 
-            sampleRate, data = read_audio(newPath, includeSampleRate=True)
-            audio = downsample(data, audio_sample_rate, sampleRate)
-            audio = normalize(audio)
-            write_audio(newPath, audio_sample_rate, audio)
+                sampleRate, data = read_audio(newPath, includeSampleRate=True)
+                audio = downsample(data, audio_sample_rate, sampleRate)
+                audio = normalize(audio)
+                write_audio(newPath, audio_sample_rate, audio)
 
 def read_audio(path, includeSampleRate=False):
-    data = wavfile.read(path)[1]
+    with wave.open(path, 'rb') as f:
 
-    if data.ndim == 2:
-        audio = np.add(data[:, 0], data[:, 1])
-    else:
-        audio = data
+        sample_rate = f.getframerate()
+        channels = f.getnchannels()
+        data = f.readframes(f.getnframes())
+
+        audio = np.frombuffer(data, dtype="<h")
+        audio = audio.reshape(-1, channels) / (2 ** 15 - 1)
+
+    if audio.ndim == 2:
+        audio = np.mean(audio, axis=1)
 
     if includeSampleRate:
-        return wavfile.read(path)[0], audio
-    else:
-        return audio
+        return sample_rate, audio
+
+    return audio
     
 def normalize(audio):
-    return audio / np.max(audio)
+    return audio / np.max(np.abs(audio))
 
 def write_audio(path, sample_rate, audio):
-    wavfile.write(path, sample_rate, audio)
+    audio = np.array([audio, audio]).T
+    audio = (audio * (2 ** 15 - 1)).astype("<h")
+
+    with wave.open(path, "w") as f:
+        f.setnchannels(2)
+        f.setsampwidth(2)
+        f.setframerate(sample_rate)
+        f.writeframes(audio.tobytes())
 
 def downsample(data: np.ndarray, newSampleRate, originalSampleRate) -> np.ndarray:
     return data[np.linspace(0, data.shape[0], newSampleRate*data.shape[0]//originalSampleRate, endpoint=False, dtype=int)]

@@ -7,15 +7,23 @@ from configs import *
 from player import *
 
 def build_walls(mode):
-    walls = np.zeros((WIDTH, HEIGHT), dtype=bool)
+    if mode == 'visual':
 
-    for i in range(WIDTH):
-        for j in range(WIDTH):
-            if (i - 400)**2 / 200**2 + (j - 225)**2 / 150**2 >= 1 and (i - 400)**2 / (200+30)**2 + (j - 225)**2 / (150+30)**2 < 1:
-                walls[i, j] = True
-    
+        walls = np.zeros((WIDTH, HEIGHT), dtype=bool)
+
+        for i in range(WIDTH):
+            for j in range(HEIGHT):
+                if (i - 400)**2 / 200**2 + (j - 225)**2 / 150**2 >= 1 and (i - 400)**2 / (200+3)**2 + (j - 225)**2 / (150+3)**2 < 1:
+                    walls[i, j] = True
+
     if mode == 'audio':
-        return walls[::10, ::10]
+
+        walls = np.zeros((WIDTH//SCALING, HEIGHT//SCALING), dtype=bool)
+
+        for i in range(WIDTH//SCALING):
+            for j in range(HEIGHT//SCALING):
+                if (i - 400/SCALING)**2 / (200/SCALING)**2 + (j - 225/SCALING)**2 / (150/SCALING)**2 >= 1 and (i - 400/SCALING)**2 / (200/SCALING+3)**2 + (j - 225/SCALING)**2 / (150/SCALING+3)**2 < 1:
+                    walls[i, j] = True
     
     return walls
 
@@ -25,17 +33,17 @@ if __name__ == '__main__':
     setup("assets", AUDIO_RATE)
 
     speakers = [
-        Speaker((268, 225), 0, "assets/audio/audio.wav", 5),
-        Speaker((300, 315), 0, "assets/audio/audio.wav"),
-        Speaker((390, 290), 2, "assets/audio/audio.wav"),
-        Speaker((510, 300), 5, "assets/audio/audio.wav"),
-        Speaker((320, 160), 0, "assets/audio/audio.wav"),
-        Speaker((405, 140), 3, "assets/audio/audio.wav"),
-        Speaker((504, 145), 0, "assets/audio/audio.wav")
+        Speaker((268, 225), 0, "main"),
+        Speaker((300, 315), 0.2, "Noise 1"),
+        Speaker((390, 290), 1.2, "Noise 2"),
+        Speaker((510, 300), 0.7, "Noise 3"),
+        Speaker((320, 160), 0.4, "Noise 4"),
+        Speaker((405, 140), 1.5, "Noise 5"),
+        Speaker((504, 145), 1.4, "Noise 6")
     ]
 
-    walls = build_walls("audio")
+    walls = build_walls("visual")
 
-    # play_simulation(speakers, walls)
-    play_fullspeed(speakers, walls)
+    play_simulation(speakers, walls)
+    # play_fullspeed(speakers, walls)
     # get_audio(speakers, walls)

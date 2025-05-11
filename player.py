@@ -15,7 +15,7 @@ def get_audio(speakers, walls):
     audio_simulation.extract_audio()
 
 def play_fullspeed(speakers, walls):
-    window = pygame.display.set_mode((WIDTH // SCALING + 2*BUFFER, HEIGHT//10 + 2*BUFFER))
+    window = pygame.display.set_mode((WIDTH // SCALING + 2*BUFFER, HEIGHT // SCALING + 2*BUFFER))
     
     wave_simulation = WaveSimulation(window, speakers, walls, mode='audio')
     wave_simulation.play_simulation()

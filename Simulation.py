@@ -16,8 +16,10 @@ class Simulation:
             self.width = WIDTH // SCALING
             self.height = HEIGHT // SCALING
             self.delta_time = 1/AUDIO_RATE
-            self.damping_factor = AUDIO_DAMPING
             self.wavespeed = 0.75 / self.delta_time / np.sqrt(2)
+
+            self.damping = REAL_DAMPING * 343 / 100 * self.delta_time
+
             self.time_increment = 1
 
         elif self.mode == 'visual':
@@ -25,8 +27,10 @@ class Simulation:
             self.width = WIDTH
             self.height = HEIGHT
             self.delta_time = 1/VIDEO_RATE
-            self.damping_factor = VIDEO_DAMPING
             self.wavespeed = 0.98 / self.delta_time / np.sqrt(2)
+
+            self.damping = REAL_DAMPING * 343 / 100 * self.delta_time
+
             self.time_increment = AUDIO_RATE // VIDEO_RATE
 
         else:
@@ -36,9 +40,9 @@ class Simulation:
         self.current_space = np.zeros((self.width, self.height))
         self.past_space = np.zeros((self.width, self.height))
 
-        self.alpha = self.wavespeed**2 * self.delta_time**2 - self.damping_factor
-        self.beta = self.damping_factor - 1
-        self.gamma = 2 - self.damping_factor
+        self.alpha = self.wavespeed**2 * self.delta_time**2 * np.power(10, -self.damping/10)
+        self.beta = - np.power(10, -self.damping/10)
+        self.gamma = 1 + np.power(10, -self.damping/10)
 
         # wall setup
         self.wall_map = np.zeros((self.width, self.height))
@@ -63,7 +67,7 @@ class Simulation:
         self.speakers.append(speaker)
 
     def draw(self):
-        pixels = 255*self.cmap(((self.current_space + self.wall_map) + 2)/4)[:,:,:3]
+        pixels = 255*self.cmap(((self.current_space + self.wall_map) + 3)/6)[:,:,:3]
 
         surf = pygame.surfarray.make_surface(pixels)
         self.window.blit(surf, (BUFFER, BUFFER))
@@ -84,8 +88,8 @@ class Simulation:
         self.past_space[1:-1, 1:-1] = center_space
 
         # border collisions
-        self.current_space[[0, -1], :] = WALL_DAMPING * self.current_space[[1, -2], :]
-        self.current_space[:, [0, -1]] = WALL_DAMPING * self.current_space[:, [1, -2]]
+        self.current_space[[0, -1], :] = WALL_DAMPING * self.current_space[[1, -2], :] + (1 - WALL_DAMPING) * self.past_space[[1, -2], :]
+        self.current_space[:, [0, -1]] = WALL_DAMPING * self.current_space[:, [1, -2]] + (1 - WALL_DAMPING) * self.past_space[:, [1, -2]]
 
         # wall collisions
         self.neighbor_sum[1:-1, 1:-1] = ( self.not_walls[1:-1,  :-2] * self.current_space[1:-1,  :-2]
@@ -93,7 +97,7 @@ class Simulation:
                                     + self.not_walls[2:  , 1:-1] * self.current_space[2:  , 1:-1]
                                     + self.not_walls[1:-1, 2:  ] * self.current_space[1:-1, 2:  ] )
 
-        self.current_space = np.where(self.walls, WALL_DAMPING * (self.neighbor_sum / self.neighbor_not_wall_count), self.current_space)
+        self.current_space = np.where(self.walls, WALL_DAMPING * (self.neighbor_sum / self.neighbor_not_wall_count) + (1 - WALL_DAMPING) * self.past_space, self.current_space)
 
         self.update_speakers()
 
@@ -102,7 +106,7 @@ class Simulation:
     def apply_impulse(self, point, strength):
         if self.mode == 'audio':
             
-            self.current_space[point[0] // SCALING, point[1] // SCALING] += strength
+            self.current_space[point[0] // SCALING, point[1] // SCALING] += 16 * strength
 
         elif self.mode == 'visual':
 
