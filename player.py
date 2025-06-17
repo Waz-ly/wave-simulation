@@ -19,3 +19,8 @@ def play_fullspeed(speakers, walls):
     
     wave_simulation = WaveSimulation(window, speakers, walls, mode='audio')
     wave_simulation.play_simulation()
+
+def get_thumbnail(speakers, walls, time):
+    simulation = WaveSimulation(None, speakers, walls, mode='visual')
+
+    simulation.get_3D_plot(time)

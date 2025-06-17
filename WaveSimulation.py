@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 import pygame
 from time import perf_counter
 from file_manager import *
@@ -54,3 +55,24 @@ class WaveSimulation:
         plt.show()
 
         write_audio("assets/audio/audio_heard.wav", AUDIO_RATE, mic)
+
+    def get_3D_plot(self, time):
+        for i in range(time):
+            self.simulation.update()
+            
+        Z = self.simulation.get_space()
+        Z = Z[150:-150:5,20:-20:5]
+        c = 0.005
+        Z = np.power(2, -np.power((Z-c)/c,2))-np.power(2, -np.power((Z+c)/c,2))/100
+        X, Y = np.meshgrid(np.arange(Z.shape[1]), np.arange(Z.shape[0]))
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        #ax.plot_surface(X, Y, Z, cmap='Wistia', edgecolor=None)
+        ax.plot_wireframe(X, Y, Z, color='orange', linewidth=0.2)
+
+        ax.set_axis_off()
+        ax.view_init(elev=30, azim=145)
+
+        plt.savefig("3d_plot.png", transparent=True, bbox_inches='tight', pad_inches=0, dpi=300)
+        plt.close()

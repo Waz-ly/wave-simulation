@@ -33,17 +33,20 @@ if __name__ == '__main__':
     setup("assets", AUDIO_RATE)
 
     speakers = [
+        # Speaker((268, 225), 0, "440")
         Speaker((268, 225), 0, "main"),
-        Speaker((300, 315), 0.2, "Noise 1"),
-        Speaker((390, 290), 1.2, "Noise 2"),
-        Speaker((510, 300), 0.7, "Noise 3"),
-        Speaker((320, 160), 0.4, "Noise 4"),
-        Speaker((405, 140), 1.5, "Noise 5"),
-        Speaker((504, 145), 1.4, "Noise 6")
+        # Speaker((300, 315), 0.2, "Noise 1"),
+        # Speaker((390, 290), 1.2, "Noise 2"),
+        # Speaker((510, 300), 0.7, "Noise 3"),
+        # Speaker((320, 160), 0.4, "Noise 4"),
+        # Speaker((405, 140), 1.5, "Noise 5"),
+        # Speaker((504, 145), 1.4, "Noise 6")
     ]
 
     walls = build_walls("visual")
 
-    play_simulation(speakers, walls)
+    # play_simulation(speakers, walls)
     # play_fullspeed(speakers, walls)
     # get_audio(speakers, walls)
+
+    get_thumbnail(speakers, walls, 450)

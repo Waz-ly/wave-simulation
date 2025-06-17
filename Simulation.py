@@ -121,3 +121,6 @@ class Simulation:
 
     def get_point(self, point):
         return self.current_space[point]
+    
+    def get_space(self):
+        return self.current_space
